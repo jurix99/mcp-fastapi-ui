@@ -1,0 +1,53 @@
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui
+    container_name: open-webui
+    volumes:
+      - open-webui:/app/backend/data
+    ports:
+      - ${OPEN_WEBUI_PORT-3000}:8080
+    restart: unless-stopped
+
+  database:
+    image: 'postgres:latest'
+    ports:
+      - 5432:5432
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    env_file: .env
+
+  fastapi:
+    build:
+      context: .
+    container_name: fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      - database   
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  mcpo-fastapi:
+      build:
+          context: .
+          dockerfile: uvx.Dockerfile
+      ports:
+      - "5000:5000"
+      command: uvx mcpo --host 0.0.0.0 --port 5000 -- npx mcp-remote ${HOST_URL-http://localhost}/mcp
+      depends_on:
+        fastapi:
+          condition: service_started
+  mcp-time:
+      build:
+          context: .
+          dockerfile: uvx.Dockerfile
+      ports:
+      - "7000:7000"
+      command: uvx mcpo --port 7000 -- uvx mcp-server-time --local-timezone=America/New_York
+      
+volumes:
+  open-webui: {}
